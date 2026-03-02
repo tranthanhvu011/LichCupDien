@@ -1,0 +1,32 @@
+name: ⚡ Check Lịch Cúp Điện
+
+on:
+  schedule:
+    # Chạy lúc 0:00 UTC = 7:00 AM Việt Nam (UTC+7) mỗi ngày
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Cho phép chạy thủ công trên GitHub
+
+jobs:
+  check-outage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create .env file
+        run: |
+          echo "CUSTOMER_CODE=${{ secrets.CUSTOMER_CODE }}" >> .env
+          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env
+          echo "TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}" >> .env
+          echo "DAYS_AHEAD=7" >> .env
+
+      - name: Check lịch cúp điện
+        run: node src/index.js --check
