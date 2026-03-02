@@ -1,19 +1,34 @@
 const fetch = require('node-fetch');
 
-const GOLD_API = 'https://vang.today/api/prices';
+// PNJ Gold Price API (từ pnj.com.vn)
+const PNJ_API = 'https://edge-cf-api.pnj.io/ecom-frontend/v1/get-gold-price';
+
+// Khu vực - mặc định Hồ Chí Minh
+const ZONES = {
+    HCM: '00',
+    CAN_THO: '07',
+    HA_NOI: '11',
+    DA_NANG: '13',
+    TAY_NGUYEN: '14',
+    DONG_NAM_BO: '21',
+};
 
 /**
- * Fetch giá vàng từ vang.today API (miễn phí, không cần API key)
+ * Fetch giá vàng từ PNJ API
+ * @param {string} zone - Mã khu vực (default: HCM)
  * @returns {Promise<object>}
  */
-async function fetchGoldPrices() {
-    console.log('🥇 Đang lấy giá vàng...');
+async function fetchGoldPrices(zone) {
+    const zoneCode = zone || ZONES.HCM;
+    console.log('🥇 Đang lấy giá vàng PNJ...');
 
     try {
-        const response = await fetch(GOLD_API, {
+        const response = await fetch(`${PNJ_API}?zone=${zoneCode}`, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
                 'Accept': 'application/json',
+                'Referer': 'https://www.pnj.com.vn/blog/gia-vang/',
+                'Origin': 'https://www.pnj.com.vn',
             },
         });
 
@@ -23,31 +38,30 @@ async function fetchGoldPrices() {
 
         const data = await response.json();
 
-        if (!data.success || !data.prices) {
+        if (!data.data) {
             throw new Error('API response không hợp lệ');
         }
 
-        // Trích xuất giá chính
-        const sjc = data.prices['SJL1L10'];     // SJC 9999 (miếng)
-        const sjcRing = data.prices['SJ9999'];   // SJC nhẫn
-        const pnj24k = data.prices['PQHN24NTT']; // PNJ 24K
-        const pnj999 = data.prices['PQHNVM'];    // PNJ 999 (Hà Nội)
-        const doji = data.prices['DOJINHTV'];    // DOJI
-        const world = data.prices['XAUUSD'];     // Thế giới
+        // Tìm Nhẫn Trơn 999 (masp: N24K)
+        const nhan999 = data.data.find(item => item.masp === 'N24K');
+        // Tìm Vàng miếng SJC
+        const sjc = data.data.find(item => item.masp === 'SJC');
 
         return {
             success: true,
-            date: data.date,
-            time: data.time,
-            prices: {
-                sjc: sjc ? { name: 'SJC 9999 (miếng)', buy: sjc.buy, sell: sjc.sell, change: sjc.change_buy } : null,
-                sjcRing: sjcRing ? { name: 'SJC Nhẫn', buy: sjcRing.buy, sell: sjcRing.sell, change: sjcRing.change_buy } : null,
-                pnj24k: pnj24k ? { name: 'PNJ 24K', buy: pnj24k.buy, sell: pnj24k.sell, change: pnj24k.change_buy } : null,
-                pnj999: pnj999 ? { name: 'PNJ 999', buy: pnj999.buy, sell: pnj999.sell, change: pnj999.change_buy } : null,
-                doji: doji ? { name: 'DOJI', buy: doji.buy, sell: doji.sell, change: doji.change_buy } : null,
-                world: world ? { name: 'Thế giới (XAU/USD)', price: world.buy, change: world.change_buy } : null,
-            },
-            raw: data.prices,
+            updateDate: data.updateDate || new Date().toLocaleString('vi-VN'),
+            region: data.chinhanh || 'HCM',
+            nhan999: nhan999 ? {
+                name: nhan999.tensp || 'Nhẫn Trơn PNJ 999.9',
+                buy: nhan999.giamua * 10000, // API trả đơn vị 10.000đ
+                sell: nhan999.giaban * 10000,
+            } : null,
+            sjc: sjc ? {
+                name: sjc.tensp || 'Vàng miếng SJC 999.9',
+                buy: sjc.giamua * 10000,
+                sell: sjc.giaban * 10000,
+            } : null,
+            allProducts: data.data,
         };
     } catch (error) {
         console.error(`❌ Lỗi lấy giá vàng: ${error.message}`);
@@ -64,61 +78,35 @@ function formatVND(amount) {
 }
 
 /**
- * Format message Telegram cho giá vàng
+ * Format message Telegram cho giá vàng PNJ
  */
 function formatGoldMessage(result) {
-    const { date, time, prices } = result;
+    const { updateDate, nhan999, sjc } = result;
 
     const lines = [
-        '🥇 *GIÁ VÀNG HÔM NAY* 🥇',
+        '🥇 *GIÁ VÀNG PNJ HÔM NAY* 🥇',
         '',
-        `📅 Ngày: ${date}`,
-        `⏰ Cập nhật: ${time}`,
+        `⏰ Cập nhật: ${updateDate}`,
         '',
         '━━━━━━━━━━━━━━━━━━━━',
     ];
 
-    if (prices.sjc) {
-        const arrow = prices.sjc.change > 0 ? '📈' : prices.sjc.change < 0 ? '📉' : '➡️';
-        lines.push(`*${prices.sjc.name}*`);
-        lines.push(`   Mua: ${formatVND(prices.sjc.buy)}`);
-        lines.push(`   Bán: ${formatVND(prices.sjc.sell)}`);
-        lines.push(`   ${arrow} Thay đổi: ${prices.sjc.change > 0 ? '+' : ''}${formatVND(prices.sjc.change)}`);
+    if (nhan999) {
+        lines.push(`💍 *${nhan999.name}*`);
+        lines.push(`   Mua vào: ${formatVND(nhan999.buy)}`);
+        lines.push(`   Bán ra:  ${formatVND(nhan999.sell)}`);
         lines.push('');
     }
 
-    if (prices.sjcRing) {
-        lines.push(`*${prices.sjcRing.name}*`);
-        lines.push(`   Mua: ${formatVND(prices.sjcRing.buy)}`);
-        lines.push(`   Bán: ${formatVND(prices.sjcRing.sell)}`);
-        lines.push('');
-    }
-
-    if (prices.pnj24k) {
-        lines.push(`*${prices.pnj24k.name}*`);
-        lines.push(`   Mua: ${formatVND(prices.pnj24k.buy)}`);
-        lines.push(`   Bán: ${formatVND(prices.pnj24k.sell)}`);
-        lines.push('');
-    }
-
-    if (prices.pnj999) {
-        lines.push(`*${prices.pnj999.name}*`);
-        lines.push(`   Mua: ${formatVND(prices.pnj999.buy)}`);
-        lines.push(`   Bán: ${formatVND(prices.pnj999.sell)}`);
-        lines.push('');
-    }
-
-    if (prices.doji) {
-        lines.push(`*${prices.doji.name}*`);
-        lines.push(`   Mua: ${formatVND(prices.doji.buy)}`);
-        lines.push(`   Bán: ${formatVND(prices.doji.sell)}`);
+    if (sjc) {
+        lines.push(`🏅 *${sjc.name}*`);
+        lines.push(`   Mua vào: ${formatVND(sjc.buy)}`);
+        lines.push(`   Bán ra:  ${formatVND(sjc.sell)}`);
         lines.push('');
     }
 
     lines.push('━━━━━━━━━━━━━━━━━━━━');
-    if (prices.world) {
-        lines.push(`🌍 *${prices.world.name}*: $${prices.world.price}`);
-    }
+    lines.push('_Nguồn: pnj.com.vn_');
 
     return lines.join('\n');
 }
