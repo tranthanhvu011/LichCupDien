@@ -30,7 +30,8 @@ async function fetchGoldPrices() {
         // Trích xuất giá chính
         const sjc = data.prices['SJL1L10'];     // SJC 9999 (miếng)
         const sjcRing = data.prices['SJ9999'];   // SJC nhẫn
-        const pnj = data.prices['PQHN24NTT'];   // PNJ 24K
+        const pnj24k = data.prices['PQHN24NTT']; // PNJ 24K
+        const pnj999 = data.prices['PQHNVM'];    // PNJ 999 (Hà Nội)
         const doji = data.prices['DOJINHTV'];    // DOJI
         const world = data.prices['XAUUSD'];     // Thế giới
 
@@ -41,7 +42,8 @@ async function fetchGoldPrices() {
             prices: {
                 sjc: sjc ? { name: 'SJC 9999 (miếng)', buy: sjc.buy, sell: sjc.sell, change: sjc.change_buy } : null,
                 sjcRing: sjcRing ? { name: 'SJC Nhẫn', buy: sjcRing.buy, sell: sjcRing.sell, change: sjcRing.change_buy } : null,
-                pnj: pnj ? { name: 'PNJ 24K', buy: pnj.buy, sell: pnj.sell, change: pnj.change_buy } : null,
+                pnj24k: pnj24k ? { name: 'PNJ 24K', buy: pnj24k.buy, sell: pnj24k.sell, change: pnj24k.change_buy } : null,
+                pnj999: pnj999 ? { name: 'PNJ 999', buy: pnj999.buy, sell: pnj999.sell, change: pnj999.change_buy } : null,
                 doji: doji ? { name: 'DOJI', buy: doji.buy, sell: doji.sell, change: doji.change_buy } : null,
                 world: world ? { name: 'Thế giới (XAU/USD)', price: world.buy, change: world.change_buy } : null,
             },
@@ -92,10 +94,17 @@ function formatGoldMessage(result) {
         lines.push('');
     }
 
-    if (prices.pnj) {
-        lines.push(`*${prices.pnj.name}*`);
-        lines.push(`   Mua: ${formatVND(prices.pnj.buy)}`);
-        lines.push(`   Bán: ${formatVND(prices.pnj.sell)}`);
+    if (prices.pnj24k) {
+        lines.push(`*${prices.pnj24k.name}*`);
+        lines.push(`   Mua: ${formatVND(prices.pnj24k.buy)}`);
+        lines.push(`   Bán: ${formatVND(prices.pnj24k.sell)}`);
+        lines.push('');
+    }
+
+    if (prices.pnj999) {
+        lines.push(`*${prices.pnj999.name}*`);
+        lines.push(`   Mua: ${formatVND(prices.pnj999.buy)}`);
+        lines.push(`   Bán: ${formatVND(prices.pnj999.sell)}`);
         lines.push('');
     }
 
